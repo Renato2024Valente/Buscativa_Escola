@@ -8,7 +8,9 @@ import os
 app = Flask(__name__, static_folder="static", template_folder="templates")
 CORS(app)
 
-client = MongoClient("mongodb+srv://bicudo:bicudo25@cluster0.fik4cee.mongodb.net/?retryWrites=true&w=majority&tls=true")
+# Conexão com MongoDB usando variável de ambiente
+MONGO_URI = os.environ.get("MONGO_URI")
+client = MongoClient(MONGO_URI)
 db = client["buscativa_escolar"]
 colecao_frequencia = db["frequencia"]
 colecao_buscativa = db["registro"]
@@ -52,14 +54,13 @@ def registrar_frequencia():
             "dataFalta": datetime.now().strftime("%Y-%m-%d"),
             "tipoContato": "Sistema Frequência",
             "responsavel": "Sistema Frequência",
-            "resultado": f"Frequência abaixo de {freq}%",
+            "resultado": "Frequência abaixo de 80%",
             "observacoes": "",
             "dataRegistro": datetime.now()
         }
         colecao_buscativa.insert_one(alerta)
 
     return jsonify({"status": "success", "frequencia": freq})
-
 
 @app.route("/api/buscativa", methods=["GET", "POST"])
 def buscativa():
@@ -81,6 +82,7 @@ def limpar_alertas():
         "resultado": {"$regex": "Frequência abaixo"}
     })
     return jsonify({"status": "ok", "removidos": resultado.deleted_count, "message": "Alertas removidos com sucesso."})
+
 @app.route("/api/frequencia-listar")
 def listar_frequencias():
     registros = list(colecao_frequencia.find().sort("dataRegistro", -1))
@@ -88,6 +90,16 @@ def listar_frequencias():
         r["_id"] = str(r["_id"])
     return jsonify(registros)
 
+# ✅ Rota de teste de conexão MongoDB
+@app.route("/teste-mongo")
+def teste_mongo():
+    try:
+        client.admin.command("ping")
+        return jsonify({"status": "ok", "mensagem": "Conectado com sucesso ao MongoDB Atlas"})
+    except Exception as e:
+        return jsonify({"status": "erro", "mensagem": str(e)})
+
+# Porta para Render
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
